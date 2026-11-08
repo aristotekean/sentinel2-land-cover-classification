@@ -1,0 +1,21 @@
+# Phase 1 workbench: extraction of pixel samples, TSV construction, training,
+# hyper-parameter optimisation and full-scene inference from JupyterLab.
+#
+# mlflow and scikit-learn are pinned to the same versions as apps/airflow,
+# apps/streamlit and apps/api so a model logged here deserialises there.
+mlflow==3.18.0
+scikit-learn==1.9.1
+pandas>=2.2,<3
+# Geospatial I/O: Sentinel-2 bands (JP2/GeoTIFF) and training polygons.
+rasterio==1.5.2
+geopandas==1.2.0
+shapely==2.2.0
+pyproj==3.8.0
+# Hyper-parameter optimisation.
+optuna==5.0.0
+# Stack clients: MinIO (S3) and the PostGIS training database.
+boto3==1.43.126
+psycopg2-binary==2.9.13
+sqlalchemy==2.1.8
+geoalchemy2==0.21.0
+pyarrow==26.0.1

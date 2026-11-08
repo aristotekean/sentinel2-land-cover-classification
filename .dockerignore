@@ -1,0 +1,12 @@
+.git
+.venv
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ipynb_checkpoints
+**/.DS_Store
+data
+notebooks
+apps/airflow/logs
+odd
+.atl

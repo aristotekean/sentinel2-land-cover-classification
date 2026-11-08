@@ -1,0 +1,311 @@
+# Sentinel-2 land-cover classification · docker compose (local MLOps stack)
+#
+#   minio      MinIO                 bands, polygons, TSV datasets, GeoTIFF predictions, MLflow artifacts
+#   postgres   PostgreSQL + PostGIS  databases: mlflow (backend store), airflow (metadata), training (PostGIS)
+#   mlflow     MLflow                tracking server + model registry (artifacts proxied to MinIO)
+#   jupyter    JupyterLab            extraction, TSV, training, HPO              phase 1
+#   airflow-*  Airflow               DAGs: retrain model, predict raster          phase 2 (apps/airflow/compose.yml)
+#   streamlit  Streamlit             map, metrics, class areas                    phase 2
+#   api        FastAPI               pixel inference (optional)                   phase 2
+#
+# From the repository root:
+#   cp .env.example .env
+#   docker compose up -d --build                                  # whole stack
+#   docker compose up -d --build postgres minio mlflow jupyter    # phase 1 services only
+#   docker compose down                                           # stop everything (add -v to drop the data)
+#
+# Configuration: every value (credentials, ports, image tag, buckets, model
+# name) comes from .env at the repository root; there are no defaults here. A
+# missing variable stops compose with "required variable ... is missing a value".
+#
+# Images are built on this host from the Dockerfiles under apps/ (phase 1 and
+# phase 2 pin the same mlflow and scikit-learn versions so a model trained in
+# Jupyter deserialises in Airflow, Streamlit and the API).
+
+name: sentinel2
+
+include:
+  - path: apps/airflow/compose.yml
+
+# Shared by every MLflow client (Jupyter, Airflow, Streamlit, API).
+x-mlflow-client-env: &mlflow-client-env
+  MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:?}
+  MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:?}
+  # Artifacts are proxied by the server (--serve-artifacts). The S3 variables
+  # give direct access to the data bucket (bands, TSV, GeoTIFF) through boto3.
+  MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:?}
+  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
+  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+  DATA_BUCKET: ${DATA_BUCKET:?}
+  MODEL_NAME: ${MODEL_NAME:?}
+  MODEL_ALIAS: ${MODEL_ALIAS:?}
+  BAND_NAMES: ${BAND_NAMES:?}
+
+# Training database (PostGIS) as seen from inside the stack.
+x-train-db-env: &train-db-env
+  TRAIN_DB_HOST: ${TRAIN_DB_HOST:?}
+  TRAIN_DB_PORT: ${TRAIN_DB_PORT:?}
+  TRAIN_DB_NAME: ${TRAIN_DB_NAME:?}
+  TRAIN_DB_USER: ${TRAIN_DB_USER:?}
+  TRAIN_DB_PASSWORD: ${TRAIN_DB_PASSWORD:?}
+
+services:
+  # ------------------------------------------------------------------------- #
+  # PostgreSQL + PostGIS · one instance, three databases
+  #
+  # infra/database/init/01-create-databases.sh runs on the first start of the
+  # volume and creates mlflow, airflow and training (with the PostGIS
+  # extension). Multi-arch build of the official postgis/postgis image, which
+  # is amd64 only.
+  # ------------------------------------------------------------------------- #
+  postgres:
+    image: ghcr.io/baosystems/postgis:16-3.5
+    container_name: sentinel2-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      # Read by the init script.
+      MLFLOW_DB_NAME: ${MLFLOW_DB_NAME:?}
+      MLFLOW_DB_USER: ${MLFLOW_DB_USER:?}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?}
+      AIRFLOW_DB_NAME: ${AIRFLOW_DB_NAME:?}
+      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER:?}
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?}
+      TRAIN_DB_NAME: ${TRAIN_DB_NAME:?}
+      TRAIN_DB_USER: ${TRAIN_DB_USER:?}
+      TRAIN_DB_PASSWORD: ${TRAIN_DB_PASSWORD:?}
+    ports:
+      # Change POSTGRES_PORT if the host already runs PostgreSQL.
+      - "${POSTGRES_PORT:?}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h forces TCP: while the init scripts run, the temporary server only
+      # listens on the unix socket, so the databases exist once this passes.
+      test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-U", "${POSTGRES_USER:?}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # One-shot: applies pending infra/database/migrations to the training
+  # database (training.samples, training.class_areas) before Jupyter or any
+  # DAG touches it.
+  train-db-migrate:
+    image: ghcr.io/baosystems/postgis:16-3.5
+    container_name: sentinel2-train-db-migrate
+    entrypoint: [ "sh", "/database/migrate.sh" ]
+    environment:
+      PGHOST: ${TRAIN_DB_HOST:?}
+      PGPORT: ${TRAIN_DB_PORT:?}
+      PGDATABASE: ${TRAIN_DB_NAME:?}
+      PGUSER: ${TRAIN_DB_USER:?}
+      PGPASSWORD: ${TRAIN_DB_PASSWORD:?}
+    volumes:
+      - ./infra/database:/database:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------------- #
+  # MinIO · object store
+  #
+  # Buckets (created by minio-init):
+  #   MLFLOW_ARTIFACTS_BUCKET  MLflow artifacts: models, metrics, plots
+  #   DATA_BUCKET              bands/ polygons/ tsv/ predictions/
+  #
+  # Chainguard build of MinIO (MinIO removed its own public images in 2026-09).
+  # Distroless-style image: runs as uid 65532, ships `minio` and `mc` only.
+  # Chainguard publishes only the `latest` tag for free, hence the unpinned
+  # image; pin a digest (image@sha256:...) when reproducibility matters.
+  # ------------------------------------------------------------------------- #
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: sentinel2-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+    ports:
+      - "${MINIO_PORT:?}:9000"
+      - "${MINIO_CONSOLE_PORT:?}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # One-shot: MinIO does not create buckets on start. Reuses the same image
+  # (it ships `mc`) to create the artifact and data buckets.
+  minio-init:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: sentinel2-minio-init
+    entrypoint: [ "/bin/sh", "-c" ]
+    # Credentials and bucket names go through the environment and are expanded
+    # by the container shell ($$), so special characters in them are safe.
+    command:
+      - |
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$MLFLOW_ARTIFACTS_BUCKET"
+        mc mb --ignore-existing "local/$$DATA_BUCKET"
+        for prefix in bands polygons tsv predictions; do
+          mc mb --ignore-existing "local/$$DATA_BUCKET/$$prefix"
+        done
+        echo "buckets ready: $$MLFLOW_ARTIFACTS_BUCKET $$DATA_BUCKET"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:?}
+      DATA_BUCKET: ${DATA_BUCKET:?}
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  # ------------------------------------------------------------------------- #
+  # MLflow · tracking server + model registry
+  #
+  # Backend store: the mlflow database on postgres. Artifacts: MinIO bucket
+  # MLFLOW_ARTIFACTS_BUCKET, proxied through the server so clients never need
+  # bucket credentials. apps/mlflow/Dockerfile adds the two client libraries
+  # the official image lacks (psycopg2 for Postgres, boto3 for S3).
+  # ------------------------------------------------------------------------- #
+  mlflow:
+    image: ${DOCKERHUB_USER:?}/sentinel2-mlflow:${IMAGE_TAG:?}
+    build:
+      context: .
+      dockerfile: apps/mlflow/Dockerfile
+    container_name: sentinel2-mlflow
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - |
+        # DNS-rebinding guard (--allowed-hosts): requests whose Host header is
+        # not listed get 403 (only /health is exempt). Add the IP/hostname used
+        # to open the UI from another machine through MLFLOW_ALLOWED_HOSTS,
+        # e.g. 192.168.1.50:*, and its origin through MLFLOW_CORS_ALLOWED_ORIGINS,
+        # e.g. http://192.168.1.50:5001. The database credentials and the bucket
+        # are expanded by the container shell ($$) from the environment below.
+        exec mlflow server \
+          --host 0.0.0.0 \
+          --port 5000 \
+          --backend-store-uri "postgresql+psycopg2://$${MLFLOW_DB_USER}:$${MLFLOW_DB_PASSWORD}@postgres:5432/$${MLFLOW_DB_NAME}" \
+          --artifacts-destination "s3://$${MLFLOW_ARTIFACTS_BUCKET}" \
+          --serve-artifacts \
+          ${MLFLOW_CORS_ALLOWED_ORIGINS:+--cors-allowed-origins ${MLFLOW_CORS_ALLOWED_ORIGINS}} \
+          --allowed-hosts "localhost:*,127.0.0.1:*,mlflow:*${MLFLOW_ALLOWED_HOSTS:+,${MLFLOW_ALLOWED_HOSTS}}"
+    environment:
+      MLFLOW_DB_NAME: ${MLFLOW_DB_NAME:?}
+      MLFLOW_DB_USER: ${MLFLOW_DB_USER:?}
+      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?}
+      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:?}
+      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:?}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+    ports:
+      # Host port 5001 by default: macOS AirPlay Receiver squats 5000.
+      - "${MLFLOW_PORT:?}:5000"
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:5000/health', timeout=4)" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------------- #
+  # Jupyter · phase 1 workbench (extraction, TSV, training, HPO)
+  #
+  # apps/jupyter/Dockerfile: JupyterLab (scipy stack) plus rasterio, geopandas,
+  # mlflow, optuna and the database/S3 clients. Notebooks live in ./notebooks
+  # (versioned) and local copies of the scene in ./data (git-ignored); the same
+  # files can also be read from and written to the MinIO data bucket.
+  # ------------------------------------------------------------------------- #
+  jupyter:
+    image: ${DOCKERHUB_USER:?}/sentinel2-jupyter:${IMAGE_TAG:?}
+    build:
+      context: .
+      dockerfile: apps/jupyter/Dockerfile
+    container_name: sentinel2-jupyter
+    environment:
+      <<: [ *mlflow-client-env, *train-db-env ]
+      # Login token of the UI (http://localhost:8888/?token=...).
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:?}
+    ports:
+      - "${JUPYTER_PORT:?}:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ./data:/home/jovyan/data
+    healthcheck:
+      # /api answers without authentication.
+      test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8888/api', timeout=4)" ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      train-db-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------------- #
+  # Streamlit · phase 2 dashboard (map, metrics, class areas)
+  #
+  # Reads the production model from the MLflow registry, the predicted GeoTIFF
+  # from the MinIO data bucket and the class areas from the training database.
+  # ------------------------------------------------------------------------- #
+  streamlit:
+    image: ${DOCKERHUB_USER:?}/sentinel2-streamlit:${IMAGE_TAG:?}
+    build:
+      context: .
+      dockerfile: apps/streamlit/Dockerfile
+    container_name: sentinel2-streamlit
+    environment:
+      <<: [ *mlflow-client-env, *train-db-env ]
+    ports:
+      - "${STREAMLIT_PORT:?}:8501"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+      train-db-migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ------------------------------------------------------------------------- #
+  # FastAPI · optional pixel inference
+  #
+  # Serves models:/<MODEL_NAME>@<MODEL_ALIAS> from the registry. Until a model
+  # carries the alias, /predict/* answers 503 and /health reports
+  # model_loaded=false; POST /model/reload retries without a restart.
+  # ------------------------------------------------------------------------- #
+  api:
+    image: ${DOCKERHUB_USER:?}/sentinel2-api:${IMAGE_TAG:?}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: sentinel2-api
+    environment:
+      <<: *mlflow-client-env
+    ports:
+      - "${API_PORT:?}:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+    name: sentinel2_postgres
+  minio-data:
+    name: sentinel2_minio

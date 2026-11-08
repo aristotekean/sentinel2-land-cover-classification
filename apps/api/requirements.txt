@@ -1,0 +1,9 @@
+# Optional inference API (pixel / clip).
+# mlflow and scikit-learn match apps/jupyter and apps/airflow so the registered
+# model deserialises with identical code.
+fastapi==0.162.2
+uvicorn[standard]==0.54.0
+mlflow==3.18.0
+scikit-learn==1.9.1
+pandas>=2.2,<3
+boto3==1.43.126

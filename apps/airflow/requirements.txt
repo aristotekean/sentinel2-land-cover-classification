@@ -1,0 +1,13 @@
+# Python dependencies of the DAGs (retrain_model, predict_raster).
+#
+# mlflow and scikit-learn match apps/jupyter so the model trained in phase 1
+# deserialises with identical code. Do not pin libraries the Airflow image
+# already ships and depends on (SQLAlchemy, boto3/botocore, psycopg2):
+# upgrading them breaks the api-server (flask-appbuilder) or `pip check`.
+mlflow==3.18.0
+scikit-learn==1.9.1
+pandas>=2.2,<3
+rasterio==1.5.2
+geopandas==1.2.0
+boto3
+psycopg2-binary

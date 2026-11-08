@@ -220,3 +220,10 @@ __marimo__/
 .streamlit/secrets.toml
 
 .atl/
+# Project data: local copies of the Sentinel-2 scene, polygons, TSV and rasters
+# (the stack stores them in MinIO). Keep the folder so compose can mount it.
+data/*
+!data/.keep
+
+# Airflow runtime
+apps/airflow/logs/

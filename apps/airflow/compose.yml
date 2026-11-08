@@ -1,0 +1,147 @@
+# Sentinel-2 land-cover classification · Airflow slice (phase 2)
+#
+# Included by the root docker-compose.yml. Paths are relative to this file.
+#
+#   airflow-*  --->  postgres (airflow database: metadata; training database: samples, areas)
+#   airflow-*  --->  mlflow   (logs runs, registers the model, resolves models:/<name>@<alias>)
+#   airflow-*  --->  minio    (reads the bands, writes the predicted GeoTIFF)
+#
+# Every value comes from .env at the repository root (see .env.example).
+# Standalone (Airflow only, from the repository root), passing it explicitly
+# because the project directory is then apps/airflow:
+#   docker compose --env-file .env -f apps/airflow/compose.yml up -d --build
+
+x-airflow-common: &airflow-common
+  image: ${DOCKERHUB_USER:?}/sentinel2-airflow:${IMAGE_TAG:?}
+  build:
+    context: ../..
+    dockerfile: apps/airflow/Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER:?}:${AIRFLOW_DB_PASSWORD:?}@postgres:5432/${AIRFLOW_DB_NAME:?}
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY?}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    # Training database (PostGIS) read and written by the DAGs.
+    TRAIN_DB_HOST: ${TRAIN_DB_HOST:?}
+    TRAIN_DB_PORT: ${TRAIN_DB_PORT:?}
+    TRAIN_DB_NAME: ${TRAIN_DB_NAME:?}
+    TRAIN_DB_USER: ${TRAIN_DB_USER:?}
+    TRAIN_DB_PASSWORD: ${TRAIN_DB_PASSWORD:?}
+    # MLflow tracking server (artifacts proxied by the server) and MinIO data bucket.
+    MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:?}
+    MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:?}
+    MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:?}
+    AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
+    AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+    DATA_BUCKET: ${DATA_BUCKET:?}
+    MODEL_NAME: ${MODEL_NAME:?}
+    MODEL_ALIAS: ${MODEL_ALIAS:?}
+    BAND_NAMES: ${BAND_NAMES:?}
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./config:/opt/airflow/config
+  # On Linux bind mounts keep the host's ownership, so the Airflow user must be
+  # the host user (AIRFLOW_UID=$(id -u) in .env) to write logs. Docker
+  # Desktop/OrbStack on macOS map ownership, so 50000 works.
+  user: "${AIRFLOW_UID:?}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    train-db-migrate:
+      condition: service_completed_successfully
+    mlflow:
+      condition: service_healthy
+
+services:
+  # One-shot: migrates the airflow database and creates the admin user.
+  airflow-init:
+    <<: *airflow-common
+    container_name: sentinel2-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID:?}:0" /opt/airflow/{logs,dags,plugins,config}
+        exec /entrypoint airflow version
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER:?}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?}
+    user: "0:0"
+
+  # LocalExecutor: api-server + scheduler + dag-processor + triggerer.
+  airflow-apiserver:
+    <<: *airflow-common
+    container_name: sentinel2-airflow-apiserver
+    command: api-server
+    ports:
+      - "${AIRFLOW_PORT:?}:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: sentinel2-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: sentinel2-airflow-dag-processor
+    command: dag-processor
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: sentinel2-airflow-triggerer
+    command: triggerer
+    healthcheck:
+      test: [ "CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"' ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully

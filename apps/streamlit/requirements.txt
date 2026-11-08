@@ -1,0 +1,9 @@
+# Phase 2 dashboard: map, metrics and class areas.
+# mlflow matches apps/jupyter and apps/airflow.
+streamlit==1.67.0
+mlflow==3.18.0
+pandas>=2.2,<3
+boto3==1.43.126
+psycopg2-binary==2.9.13
+sqlalchemy==2.1.8
+requests>=2.32
