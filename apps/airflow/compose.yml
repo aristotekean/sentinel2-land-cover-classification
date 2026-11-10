@@ -47,6 +47,8 @@ x-airflow-common: &airflow-common
     - ./logs:/opt/airflow/logs
     - ./plugins:/opt/airflow/plugins
     - ./config:/opt/airflow/config
+    # Local copy of the scene (git-ignored), read by the upload_bands DAG.
+    - ../../data:/opt/airflow/data:ro
   # On Linux bind mounts keep the host's ownership, so the Airflow user must be
   # the host user (AIRFLOW_UID=$(id -u) in .env) to write logs. Docker
   # Desktop/OrbStack on macOS map ownership, so 50000 works.

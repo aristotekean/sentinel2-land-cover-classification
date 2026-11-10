@@ -43,7 +43,7 @@ flowchart TB
 | `minio` | 1 | console <http://localhost:9001>, S3 `localhost:9000` | `minioadmin` / `minioadmin` | Buckets `mlflow` (artifacts) and `sentinel2` (`bands/`, `polygons/`, `tsv/`, `predictions/`) |
 | `mlflow` | 1 | <http://localhost:5001> | none | Tracking server and model registry; artifacts proxied to MinIO |
 | `jupyter` | 1 | <http://localhost:8888/?token=sentinel2> | token `JUPYTER_TOKEN` | JupyterLab with rasterio, geopandas, scikit-learn, optuna, mlflow; `./notebooks` and `./data` mounted |
-| `airflow-apiserver` | 2 | <http://localhost:8080> | `airflow` / `airflow` | DAGs `retrain_model` and `predict_raster` (skeletons in `apps/airflow/dags`) |
+| `airflow-apiserver` | 2 | <http://localhost:8080> | `airflow` / `airflow` | DAGs `upload_bands`, `retrain_model` and `predict_raster` (the last two are skeletons) in `apps/airflow/dags`; `./data` mounted read-only |
 | `streamlit` | 2 | <http://localhost:8501> | none | Map, metrics of the production model and class areas |
 | `api` | 2 (optional) | <http://localhost:8000/docs> | none | `POST /predict/pixel`, `GET /health`, `GET /model-info`, `POST /model/reload` |
 
@@ -51,6 +51,7 @@ Every value (ports, credentials, bucket and model names) lives in `.env`; compos
 
 ## Data flow
 
+0. **Ingestion (Airflow).** `upload_bands` streams the ten `.jp2` bands out of `./data/imagery-sentinel2-bog-band.zip` into `s3://sentinel2/bands/` and verifies their sizes. It is idempotent: bands already stored with the same size are skipped. Another archive can be passed with the `archive` param.
 1. **Extraction (Jupyter).** Read the ten 20 m bands and the training polygons (locally from `./data` or from `s3://sentinel2/bands/` and `polygons/`), sample the pixels inside each polygon and export the TSV with `Latitude`, `Longitude`, the bands in `BAND_NAMES` order and the class label. Upload it to `s3://sentinel2/tsv/` and, optionally, load it into `training.samples`.
 2. **Training and HPO (Jupyter).** Train the six architectures, tune them and log params, metrics (overall accuracy, kappa, precision, recall, F1) and confusion matrices as MLflow runs of the experiment `MLFLOW_EXPERIMENT_NAME`. Register the winner as `MODEL_NAME` and give it the alias `MODEL_ALIAS` (`production`).
 3. **Retrain and inference (Airflow).** `retrain_model` repeats step 2 from `training.samples`; `predict_raster` loads `models:/sentinel2-land-cover@production`, classifies the whole scene keeping the original CRS, uploads the GeoTIFF to `s3://sentinel2/predictions/` and stores the area per class in `training.class_areas`.
