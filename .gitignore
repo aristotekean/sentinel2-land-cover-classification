@@ -227,3 +227,6 @@ data/*
 
 # Airflow runtime
 apps/airflow/logs/
+
+# macOS
+.DS_Store
