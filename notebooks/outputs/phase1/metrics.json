@@ -1,0 +1,35 @@
+{
+  "dataset": "T18NWL_20260810T152649",
+  "samples": 583835,
+  "polygons": 11711,
+  "train_samples": 468989,
+  "test_samples": 114846,
+  "majority_class": 5,
+  "majority_baseline_accuracy": 0.7410706511328213,
+  "models": [
+    {
+      "key": "logistic_regression",
+      "model": "Logistic Regression",
+      "overall_accuracy": 0.9068752938717936,
+      "kappa": 0.7804074287696787,
+      "f1_macro": 0.5155507098919366,
+      "mlflow_run_id": "803aff78a8874dc0aa29598bba24ef39"
+    },
+    {
+      "key": "naive_bayes",
+      "model": "Naive Bayes",
+      "overall_accuracy": 0.7675147588945196,
+      "kappa": 0.5493708658226564,
+      "f1_macro": 0.43201949715062116,
+      "mlflow_run_id": "9e11d2ccb5ec45d4a8a761b365aad28a"
+    },
+    {
+      "key": "decision_tree",
+      "model": "Decision Tree",
+      "overall_accuracy": 0.8995785660797938,
+      "kappa": 0.7695039974462139,
+      "f1_macro": 0.5392774198437582,
+      "mlflow_run_id": "0c7ca36fba8f4440aa7d93c84ca58fac"
+    }
+  ]
+}

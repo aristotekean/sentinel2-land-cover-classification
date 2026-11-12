@@ -1,0 +1,10 @@
+Class,name,samples,polygons,share
+2,Dark area pixels,4106,248,0.007
+3,Cloud shadows,32712,58,0.056
+4,Vegetation,46345,1919,0.0794
+5,Not vegetated,429680,8444,0.736
+6,Water,8640,17,0.0148
+7,Unclassified,6510,361,0.0112
+8,Cloud medium probability,25348,226,0.0434
+9,Cloud high probability,30445,437,0.0521
+10,Thin cirrus,49,1,0.0001

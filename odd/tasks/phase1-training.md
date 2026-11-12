@@ -1,0 +1,36 @@
+# Phase 1: pre-processing and training
+
+Objective: deliver phase 1 of the ML101 final project (training dataset documented, preliminary metrics of three classifiers). Branch `feat/phase1-training`.
+Delivery strategy: `ask-on-risk`; forecast about 450 authored lines (notebook and report), one pull request.
+Test runner: none in the repository. Checks are functional: the notebook runs end to end inside the `jupyter` container (`jupyter nbconvert --execute`) and the report compiles with `pdflatex`.
+
+## Specs
+
+- **S1** (brief, section 4, Phase 1 deliverables): "A PDF report with the documentation of the TSV training dataset construction and preliminary evaluation metrics (specifically, the Confusion Matrix and Overall Accuracy) for a minimum of three implemented classification architectures." Deadline: "November 13, 2026. Midnight."
+- **S2** (brief, section 3.1): "Data Format: Export the extracted data as a Tab-Separated Values (TSV) file." "Required Columns: The final table must strictly include Latitude, Longitude, the 10 spectral band values, and the categorical class label derived from the polygon metadata."
+- **S3** (brief, section 3.2): the three architectures come from the six of the brief: "Logistic Regression (LR)", "K-Nearest Neighbors (KNN)", "Naive Bayes (NB)", "Decision Trees (DT)", "Support Vector Machines (SVM)", "Artificial Neural Networks (ANN)".
+- **S4** (brief, section 3.1): "The integer labels for each class must strictly follow the convention shown in Figure 2."
+
+Assumptions (not stated by the user or the brief):
+
+- A1: the three phase 1 architectures are Logistic Regression, Naive Bayes and Decision Tree, the fastest on 583,835 samples (proposed to the user on 2026-11-12, not objected).
+- A2: train and test are split by polygon (`fid`), stratified by class, so pixels of one polygon never land on both sides.
+- A3: the band values stay as the digital numbers of the TSV; scaling happens inside the model pipeline.
+- A4: the report is written in English as LaTeX and compiled to PDF. Language, authors and template are an open decision for the user.
+
+## Tasks
+
+- [x] **T1** (S1, S3, S4) Training notebook `notebooks/01_phase1_training.ipynb`: load the TSV, split by polygon, train LR, NB and DT, confusion matrix and overall accuracy per model, runs logged in MLflow, figures and metrics exported for the report. Route: inline (no writer trigger). Commit: `feat(notebooks): add the phase 1 training notebook` on `feat/phase1-training`.
+- [ ] **T2** (S1, S2) Phase 1 report `reports/phase1/`: TSV construction and the preliminary metrics of T1, LaTeX compiled to PDF. Route: inline. Depends on T1 and on the decision in A4. Commit: pending.
+
+## Log
+
+- **L1** (2026-11-12, user request, verbatim): "ok vamos a iniciar odd con la fase 1"
+- **L2** (2026-11-12, evidence) S2 is already met on `main`: DAG `extract_training_samples` (commit `b56935c`) exports `s3://sentinel2/tsv/T18NWL_20260810T152649.tsv` with the columns `Latitude`, `Longitude`, `B01`..`B12` (BAND_NAMES order) and `Class`; 583,835 rows. Checked on 2026-11-12: every pixel lies inside its polygon (PostGIS), the row count equals the polygon area divided by 400 m², and 900 values re-sampled independently match the TSV.
+- **L3** (2026-11-12, analysis) Classes present in the polygons: 2 to 10. Samples per class: 2: 4,106; 3: 32,712; 4: 46,345; 5: 429,680; 6: 8,640; 7: 6,510; 8: 25,348; 9: 30,445; 10: 49. Class 10 comes from a single polygon, so a split by polygon puts it entirely on one side.
+- **L4** (2026-11-12, analysis) The TSV has no polygon id (S2 fixes its columns), so the notebook takes `fid` from `extracted.polygon_pixels` and joins it by coordinates.
+- **L5** (2026-11-12, tooling) The `jupyter` image ships `pdflatex`, `xelatex` and `pandoc`; `seaborn` and `s3fs` are not installed (use matplotlib and boto3).
+- **L6** (2026-11-12, evidence, T1) `jupyter nbconvert --to notebook --execute --inplace 01_phase1_training.ipynb` inside the `jupyter` container finished without errors. Split by polygon: 468,989 train and 114,846 test samples, no polygon on both sides (asserted). Overall accuracy on the test set: Logistic Regression 0.9069 (kappa 0.780), Decision Tree 0.8996 (kappa 0.770), Naive Bayes 0.7675 (kappa 0.549). Majority-class baseline (always class 5): 0.7411. Confusion matrices, tables and figures are in `notebooks/outputs/phase1/`; one MLflow run per model (`phase1-<model>`).
+- **L7** (2026-11-12, analysis, T1) Class 10 (49 samples, one polygon) fell entirely in the training set, so it has no test samples and no recall. Classes 2 (dark area) and 6 (water) are recognised poorly by every model (recall 0.00 to 0.45).
+- **L8** (2026-11-12, fixes during T1) The join of the TSV with `extracted.polygon_pixels` by coordinates needs `float_precision="round_trip"` in `pd.read_csv`; the default parser does not reproduce the stored doubles and the notebook's own assertion caught it. `mlflow.sklearn.log_model` needs `skops_trusted_types=["sklearn.tree._tree.Tree"]` for the Decision Tree.
+- **L9** (2026-11-12, pending cleanup) The two failed executions left three extra runs in the MLflow experiment (two finished, one failed). Deleting them was not permitted in this session; the valid runs are the ones listed in `notebooks/outputs/phase1/metrics.json`.
