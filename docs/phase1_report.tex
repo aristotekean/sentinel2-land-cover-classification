@@ -1,0 +1,317 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[hidelinks]{hyperref}
+
+% Figures and tables come from the training notebook; see docs/build_tables.py.
+\graphicspath{{../notebooks/outputs/phase1/}}
+\captionsetup{font=small,labelfont=bf}
+
+% Replace with the names of the team members before submitting.
+\newcommand{\reportauthors}{Team members}
+
+\title{From Pixels to Predictions\\[0.3em]
+\large Phase 1 report: training dataset construction and preliminary models}
+\author{\reportauthors\\[0.3em] ML101 Final Project}
+\date{November 13, 2026}
+
+\begin{document}
+\maketitle
+
+\section{Scope}
+
+This report covers the first phase of the project: how the tabular training
+dataset was built from the Sentinel-2 scene and the ground-truth polygons, and
+the preliminary evaluation of three of the six classification architectures.
+For each model it reports the confusion matrix and the overall accuracy, as
+required for this phase. Hyper-parameter optimisation, the remaining three
+architectures and the full-scene inference belong to phase 2.
+
+\section{Source data}
+
+\paragraph{Scene.} A Sentinel-2 Level-2A product over Bogot\'a, tile T18NWL,
+acquired on August 10, 2026. It provides ten spectral bands (B01, B02, B03,
+B04, B05, B06, B07, B8A, B11 and B12) as JPEG~2000 files resampled to 20~m.
+Every band is a $5490 \times 5490$ grid of 16-bit unsigned integers in the
+coordinate reference system WGS~84 / UTM zone 18N (EPSG:32618).
+
+\paragraph{Ground truth.} A table of 11,711 polygons, each one with its
+geometry in well-known text, an identifier and the integer class label. The
+file does not declare a coordinate reference system; its extent coincides
+exactly with the extent of the tile in EPSG:32618, which is therefore the
+system assumed. The labels follow the convention of the project brief, and
+the polygons cover classes 2 to 10; classes 0, 1 and 11 are not present.
+
+\section{Construction of the TSV training dataset}
+
+\subsection{Pipeline}
+
+The dataset is built by three Airflow workflows that move the data through
+three layers, each one stored and never overwritten by the next:
+
+\begin{enumerate}
+  \item \textbf{Source files.} The ten bands are uploaded unchanged to an
+  object store (MinIO), and the polygons are loaded as they come into the
+  PostGIS table \texttt{raw.polygon\_classes}. The polygon file is validated before
+  loading: expected columns, integer identifiers and labels, no empty
+  geometry and no repeated identifier.
+  \item \textbf{Extracted pixels.} Every pixel that belongs to a polygon is
+  stored with its ten band values, its coordinates, its class and the
+  identifier of its polygon (\texttt{extracted.polygon\_pixels}). Nothing is
+  filtered at this stage.
+  \item \textbf{Training samples.} The extracted pixels are cleaned and stored
+  one row per pixel (\texttt{training.samples}), and exported as the TSV file.
+\end{enumerate}
+
+The extraction is written in Python with \texttt{rasterio} to read the bands
+and \texttt{shapely} to handle the geometries; no GIS desktop software is
+involved.
+
+\subsection{Extraction rules}
+
+\begin{itemize}
+  \item \textbf{Pixel membership.} A pixel belongs to a polygon when the centre
+  of the pixel lies inside the polygon. Each polygon is rasterised on its own
+  window of the grid, so a pixel covered by two polygons is recorded once per
+  polygon and the overlap can be examined later.
+  \item \textbf{Band values.} The ten values of a pixel are the digital numbers
+  stored in the band files, without rescaling. Before sampling, the workflow
+  checks that the ten bands share the same grid (reference system, origin,
+  resolution and size) and that this system is the one of the polygons.
+  \item \textbf{Coordinates.} The centre of each pixel is transformed from
+  EPSG:32618 to geographic coordinates (EPSG:4326) to obtain the latitude and
+  the longitude required in the table.
+  \item \textbf{Class label.} Each pixel takes the label of its polygon.
+\end{itemize}
+
+\subsection{Cleaning rules}
+
+Three rules are applied when the training samples are built: a pixel is
+dropped when any of its bands has no data (value 0); a pixel is dropped when
+it is claimed by polygons of different classes, because its label is
+ambiguous; and a pixel covered more than once by polygons of the same class is
+kept once. In this dataset none of the rules removed anything: the 583,835
+extracted pixels are 583,835 distinct pixels with data in every band and a
+single class.
+
+\subsection{Resulting table}
+
+The TSV file has 583,835 rows and thirteen columns, in this order:
+\texttt{Latitude}, \texttt{Longitude}, the ten bands (\texttt{B01},
+\texttt{B02}, \texttt{B03}, \texttt{B04}, \texttt{B05}, \texttt{B06},
+\texttt{B07}, \texttt{B8A}, \texttt{B11}, \texttt{B12}) and \texttt{Class}.
+Table~\ref{tab:sample} shows its first row and Table~\ref{tab:classes} the
+number of polygons and pixels per class.
+
+\begin{table}[H]
+\centering\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\caption{First row of the TSV training dataset.}
+\label{tab:sample}
+\begin{tabular}{rrrrrrrrrrrrr}
+\toprule
+Latitude & Longitude & B01 & B02 & B03 & B04 & B05 & B06 & B07 & B8A & B11 & B12 & Class \\
+\midrule
+5.428046467983549 & $-$74.67295509517224 & 1141 & 1805 & 2175 & 2151 & 2747 & 3776 & 4148 & 4498 & 4085 & 3210 & 4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Polygons and pixels per class in the training dataset.}
+\label{tab:classes}
+\input{tables/class_distribution}
+\end{table}
+
+The dataset is strongly imbalanced. Class 5 (not vegetated) holds 73.6\,\% of
+the pixels, while class 10 (thin cirrus) has 49 pixels that come from a single
+polygon, and class 6 (water) comes from only 17 polygons.
+
+\subsection{Verification}
+
+Three independent checks were run on the result:
+
+\begin{itemize}
+  \item \textbf{Geometry.} A spatial query in PostGIS confirms that all
+  583,835 pixel centres lie inside the polygon they were assigned to and carry
+  its class.
+  \item \textbf{Count.} The total area of the polygons divided by the area of a
+  pixel (400~m$^2$) is exactly 583,835, the number of extracted pixels.
+  \item \textbf{Values.} 900 band values were read again from the band files by
+  geographic coordinate instead of by grid position; all of them match the
+  values in the TSV.
+\end{itemize}
+
+\section{Preliminary models}
+
+\subsection{Train and test split}
+
+Pixels of the same polygon are neighbours with nearly identical spectra. If
+they were split at random, the test set would contain close copies of training
+pixels and the accuracy would be overestimated. The split is therefore made by
+polygon: every polygon goes entirely to one side. A stratified group split
+(one of five folds held out, fixed random seed) keeps the class proportions as
+close as the polygons allow. Table~\ref{tab:split} shows the result: 468,989
+training pixels and 114,846 test pixels (19.7\,\%).
+
+\begin{table}[H]
+\centering\small
+\caption{Train and test split by polygon.}
+\label{tab:split}
+\input{tables/split}
+\end{table}
+
+Class 10 comes from a single polygon, which fell in the training set, so this
+class has no test pixels and cannot be evaluated in this phase.
+
+\subsection{Models}
+
+Three architectures were trained with scikit-learn on the ten band values,
+with the default hyper-parameters of the library:
+
+\begin{itemize}
+  \item \textbf{Logistic Regression}, the linear baseline. The bands are
+  standardised (zero mean, unit variance) inside the model pipeline; the
+  iteration limit was raised to 1,000.
+  \item \textbf{Naive Bayes} with Gaussian likelihoods.
+  \item \textbf{Decision Tree}, grown without a depth limit.
+\end{itemize}
+
+Each run is tracked in MLflow with its parameters, metrics, confusion matrix
+and the fitted model.
+
+\section{Results}
+
+\subsection{Overall accuracy}
+
+Table~\ref{tab:summary} summarises the three models on the test set. The last
+row is the reference of a classifier that always predicts the most frequent
+class.
+
+\begin{table}[H]
+\centering\small
+\caption{Preliminary metrics on the test set (114,846 pixels).}
+\label{tab:summary}
+\input{tables/summary}
+\end{table}
+
+Logistic Regression and the Decision Tree reach an overall accuracy close to
+0.90, about 16 points above the baseline. Naive Bayes stays at 0.77, barely
+above it. Because of the imbalance, the overall accuracy is dominated by class
+5: a model can score 0.74 without learning anything, so the confusion matrices
+are needed to judge the models.
+
+\subsection{Confusion matrices}
+
+Tables~\ref{tab:cm-lr} to~\ref{tab:cm-dt} give the confusion matrices in
+pixel counts, with the reference class in rows and the predicted class in
+columns. Figure~\ref{fig:cm} shows the same matrices normalised by row, so
+each cell is the share of the reference class.
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Confusion matrix of Logistic Regression (overall accuracy 0.9069).}
+\label{tab:cm-lr}
+\input{tables/confusion_matrix_logistic_regression}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Confusion matrix of Naive Bayes (overall accuracy 0.7675).}
+\label{tab:cm-nb}
+\input{tables/confusion_matrix_naive_bayes}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Confusion matrix of the Decision Tree (overall accuracy 0.8996).}
+\label{tab:cm-dt}
+\input{tables/confusion_matrix_decision_tree}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{confusion_matrix_logistic_regression}
+\end{subfigure}
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{confusion_matrix_naive_bayes}
+\end{subfigure}
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{confusion_matrix_decision_tree}
+\end{subfigure}
+\caption{Confusion matrices normalised by reference class. The row of class
+10 is empty because the class has no test pixels.}
+\label{fig:cm}
+\end{figure}
+
+\subsection{Recall per class}
+
+Table~\ref{tab:recall} gives the share of each reference class that every
+model recovers, which is the diagonal of the normalised matrices.
+
+\begin{table}[H]
+\centering\small
+\caption{Recall per class on the test set.}
+\label{tab:recall}
+\input{tables/recall}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Well separated classes.} Not vegetated (5) and cloud high
+  probability (9) are recovered above 0.94 by Logistic Regression and the
+  Decision Tree. Vegetation (4) and cloud shadows (3) stay around 0.75.
+  \item \textbf{Dark area pixels (2).} No model recovers more than a quarter of
+  this class, and Logistic Regression assigns none of its 819 test pixels to it;
+  they go to not vegetated, cloud shadows and vegetation.
+  \item \textbf{Water (6).} Logistic Regression and the Decision Tree recover
+  less than 0.18. Logistic Regression sends 70\,\% of the water pixels to class
+  7 (unclassified). Naive Bayes does better here (0.45) at the cost of the
+  other classes.
+  \item \textbf{Cloud medium probability (8)} is confused with not vegetated
+  and with cloud high probability, its neighbour in the label scale.
+\end{itemize}
+
+\section{Limitations and next steps}
+
+\begin{itemize}
+  \item The metrics come from a single train and test split and from default
+  hyper-parameters; they are preliminary. Phase 2 will tune each model and
+  evaluate it with cross-validation by polygon.
+  \item The class imbalance is not corrected. Class weighting or resampling
+  will be evaluated for the minority classes, in particular water and dark
+  area pixels.
+  \item Class 10 cannot be evaluated with one polygon. It will be reported
+  separately.
+  \item The remaining architectures (K-Nearest Neighbors, Support Vector
+  Machines and Artificial Neural Networks) will be added, together with the
+  Kappa coefficient, precision, recall and F1-score for the six models.
+  \item The best model will classify the full scene to produce the thematic
+  raster and the area per class.
+\end{itemize}
+
+\appendix
+\section{Reproducibility}
+
+The source code lives in the project repository. With the scene archive and
+the polygon file under \texttt{data/}, the dataset and the results of this
+report are reproduced with these steps:
+
+\begin{enumerate}
+  \item Start the stack: \texttt{docker compose up -d}.
+  \item Run the Airflow workflows, in this order: \texttt{upload\_bands},
+  \texttt{load\_polygons},\\ \texttt{extract\_training\_samples}.
+  \item Execute the notebook \texttt{notebooks/01\_phase1\_training.ipynb}.
+  \item Generate the tables of this document from the outputs of the notebook:\\
+  \texttt{python3 docs/build\_tables.py}.
+\end{enumerate}
+
+\end{document}

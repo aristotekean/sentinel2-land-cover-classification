@@ -71,7 +71,8 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 │   ├── init/                     # creates the three databases and enables PostGIS
 │   ├── migrate.sh                # applies migrations/ to the training database
 │   └── migrations/               # schemas raw (source files), extracted (pixels inside the polygons), training (dataset, class areas)
-├── notebooks/                    # phase 1 notebooks (mounted in Jupyter)
+├── notebooks/                    # phase 1 notebooks (mounted in Jupyter) and their outputs/
+├── docs/                         # reports (LaTeX and PDF) and the script that builds their tables
 └── data/                         # local scene, polygons and rasters (git-ignored)
 ```
 
@@ -79,6 +80,7 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 
 | Task | How |
 |------|-----|
+| Build the phase 1 report | Run `notebooks/01_phase1_training.ipynb`, then `python3 docs/build_tables.py` and `latexmk -pdf phase1_report.tex` inside `docs/` |
 | Open JupyterLab | <http://localhost:8888/?token=sentinel2>; notebooks persist in `./notebooks` |
 | Copy the scene into MinIO | `mc` from the host or the MinIO console: bucket `sentinel2`, prefix `bands/` |
 | Query the training database | `docker compose exec postgres psql -U training -d training` |
