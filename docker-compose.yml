@@ -9,14 +9,15 @@
 #   api        FastAPI               pixel inference (optional)                   phase 2
 #
 # From the repository root:
-#   cp .env.example .env
 #   docker compose up -d --build                                  # whole stack
 #   docker compose up -d --build postgres minio mlflow jupyter    # phase 1 services only
 #   docker compose down                                           # stop everything (add -v to drop the data)
 #
 # Configuration: every value (credentials, ports, image tag, buckets, model
-# name) comes from .env at the repository root; there are no defaults here. A
-# missing variable stops compose with "required variable ... is missing a value".
+# name) is written in this file and in apps/airflow/compose.yml; there is no
+# .env file. They are local development defaults: change them in both files
+# before exposing the stack. A value shared by several services (database
+# credentials, bucket, model name) must stay the same everywhere it appears.
 #
 # Images are built on this host from the Dockerfiles under apps/ (phase 1 and
 # phase 2 pin the same mlflow and scikit-learn versions so a model trained in
@@ -29,25 +30,25 @@ include:
 
 # Shared by every MLflow client (Jupyter, Airflow, Streamlit, API).
 x-mlflow-client-env: &mlflow-client-env
-  MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI:?}
-  MLFLOW_EXPERIMENT_NAME: ${MLFLOW_EXPERIMENT_NAME:?}
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_EXPERIMENT_NAME: sentinel2-land-cover
   # Artifacts are proxied by the server (--serve-artifacts). The S3 variables
   # give direct access to the data bucket (bands, TSV, GeoTIFF) through boto3.
-  MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:?}
-  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
-  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
-  DATA_BUCKET: ${DATA_BUCKET:?}
-  MODEL_NAME: ${MODEL_NAME:?}
-  MODEL_ALIAS: ${MODEL_ALIAS:?}
-  BAND_NAMES: ${BAND_NAMES:?}
+  MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+  AWS_ACCESS_KEY_ID: minioadmin
+  AWS_SECRET_ACCESS_KEY: minioadmin
+  DATA_BUCKET: sentinel2
+  MODEL_NAME: sentinel2-land-cover
+  MODEL_ALIAS: production
+  BAND_NAMES: B01,B02,B03,B04,B05,B06,B07,B8A,B11,B12
 
 # Training database (PostGIS) as seen from inside the stack.
 x-train-db-env: &train-db-env
-  TRAIN_DB_HOST: ${TRAIN_DB_HOST:?}
-  TRAIN_DB_PORT: ${TRAIN_DB_PORT:?}
-  TRAIN_DB_NAME: ${TRAIN_DB_NAME:?}
-  TRAIN_DB_USER: ${TRAIN_DB_USER:?}
-  TRAIN_DB_PASSWORD: ${TRAIN_DB_PASSWORD:?}
+  TRAIN_DB_HOST: postgres
+  TRAIN_DB_PORT: "5432"
+  TRAIN_DB_NAME: training
+  TRAIN_DB_USER: training
+  TRAIN_DB_PASSWORD: training
 
 services:
   # ------------------------------------------------------------------------- #
@@ -62,28 +63,28 @@ services:
     image: ghcr.io/baosystems/postgis:16-3.5
     container_name: sentinel2-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       # Read by the init script.
-      MLFLOW_DB_NAME: ${MLFLOW_DB_NAME:?}
-      MLFLOW_DB_USER: ${MLFLOW_DB_USER:?}
-      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?}
-      AIRFLOW_DB_NAME: ${AIRFLOW_DB_NAME:?}
-      AIRFLOW_DB_USER: ${AIRFLOW_DB_USER:?}
-      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD:?}
-      TRAIN_DB_NAME: ${TRAIN_DB_NAME:?}
-      TRAIN_DB_USER: ${TRAIN_DB_USER:?}
-      TRAIN_DB_PASSWORD: ${TRAIN_DB_PASSWORD:?}
+      MLFLOW_DB_NAME: mlflow
+      MLFLOW_DB_USER: mlflow
+      MLFLOW_DB_PASSWORD: mlflow
+      AIRFLOW_DB_NAME: airflow
+      AIRFLOW_DB_USER: airflow
+      AIRFLOW_DB_PASSWORD: airflow
+      TRAIN_DB_NAME: training
+      TRAIN_DB_USER: training
+      TRAIN_DB_PASSWORD: training
     ports:
-      # Change POSTGRES_PORT if the host already runs PostgreSQL.
-      - "${POSTGRES_PORT:?}:5432"
+      # Change the host port (left side) if the host already runs PostgreSQL.
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/database/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # -h forces TCP: while the init scripts run, the temporary server only
       # listens on the unix socket, so the databases exist once this passes.
-      test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-U", "${POSTGRES_USER:?}" ]
+      test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -98,11 +99,11 @@ services:
     container_name: sentinel2-train-db-migrate
     entrypoint: [ "sh", "/database/migrate.sh" ]
     environment:
-      PGHOST: ${TRAIN_DB_HOST:?}
-      PGPORT: ${TRAIN_DB_PORT:?}
-      PGDATABASE: ${TRAIN_DB_NAME:?}
-      PGUSER: ${TRAIN_DB_USER:?}
-      PGPASSWORD: ${TRAIN_DB_PASSWORD:?}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: training
+      PGUSER: training
+      PGPASSWORD: training
     volumes:
       - ./infra/database:/database:ro
     depends_on:
@@ -126,11 +127,11 @@ services:
     container_name: sentinel2-minio
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "${MINIO_PORT:?}:9000"
-      - "${MINIO_CONSOLE_PORT:?}:9001"
+      - "9000:9000"
+      - "9001:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -159,10 +160,10 @@ services:
         done
         echo "buckets ready: $$MLFLOW_ARTIFACTS_BUCKET $$DATA_BUCKET"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?}
-      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:?}
-      DATA_BUCKET: ${DATA_BUCKET:?}
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      MLFLOW_ARTIFACTS_BUCKET: mlflow
+      DATA_BUCKET: sentinel2
     depends_on:
       minio:
         condition: service_healthy
@@ -176,7 +177,7 @@ services:
   # the official image lacks (psycopg2 for Postgres, boto3 for S3).
   # ------------------------------------------------------------------------- #
   mlflow:
-    image: ${DOCKERHUB_USER:?}/sentinel2-mlflow:${IMAGE_TAG:?}
+    image: aristotekean/sentinel2-mlflow:0.1.0
     build:
       context: .
       dockerfile: apps/mlflow/Dockerfile
@@ -185,30 +186,30 @@ services:
     command:
       - |
         # DNS-rebinding guard (--allowed-hosts): requests whose Host header is
-        # not listed get 403 (only /health is exempt). Add the IP/hostname used
-        # to open the UI from another machine through MLFLOW_ALLOWED_HOSTS,
-        # e.g. 192.168.1.50:*, and its origin through MLFLOW_CORS_ALLOWED_ORIGINS,
-        # e.g. http://192.168.1.50:5001. The database credentials and the bucket
-        # are expanded by the container shell ($$) from the environment below.
+        # not listed get 403 (only /health is exempt). To open the UI from
+        # another machine, append its IP/hostname to --allowed-hosts, e.g.
+        # ",192.168.1.50:*", and add its origin with
+        # --cors-allowed-origins http://192.168.1.50:5001. The database
+        # credentials and the bucket are expanded by the container shell ($$)
+        # from the environment below.
         exec mlflow server \
           --host 0.0.0.0 \
           --port 5000 \
           --backend-store-uri "postgresql+psycopg2://$${MLFLOW_DB_USER}:$${MLFLOW_DB_PASSWORD}@postgres:5432/$${MLFLOW_DB_NAME}" \
           --artifacts-destination "s3://$${MLFLOW_ARTIFACTS_BUCKET}" \
           --serve-artifacts \
-          ${MLFLOW_CORS_ALLOWED_ORIGINS:+--cors-allowed-origins ${MLFLOW_CORS_ALLOWED_ORIGINS}} \
-          --allowed-hosts "localhost:*,127.0.0.1:*,mlflow:*${MLFLOW_ALLOWED_HOSTS:+,${MLFLOW_ALLOWED_HOSTS}}"
+          --allowed-hosts "localhost:*,127.0.0.1:*,mlflow:*"
     environment:
-      MLFLOW_DB_NAME: ${MLFLOW_DB_NAME:?}
-      MLFLOW_DB_USER: ${MLFLOW_DB_USER:?}
-      MLFLOW_DB_PASSWORD: ${MLFLOW_DB_PASSWORD:?}
-      MLFLOW_ARTIFACTS_BUCKET: ${MLFLOW_ARTIFACTS_BUCKET:?}
-      MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL:?}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?}
+      MLFLOW_DB_NAME: mlflow
+      MLFLOW_DB_USER: mlflow
+      MLFLOW_DB_PASSWORD: mlflow
+      MLFLOW_ARTIFACTS_BUCKET: mlflow
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
     ports:
       # Host port 5001 by default: macOS AirPlay Receiver squats 5000.
-      - "${MLFLOW_PORT:?}:5000"
+      - "5001:5000"
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:5000/health', timeout=4)" ]
       interval: 15s
@@ -231,7 +232,7 @@ services:
   # files can also be read from and written to the MinIO data bucket.
   # ------------------------------------------------------------------------- #
   jupyter:
-    image: ${DOCKERHUB_USER:?}/sentinel2-jupyter:${IMAGE_TAG:?}
+    image: aristotekean/sentinel2-jupyter:0.1.0
     build:
       context: .
       dockerfile: apps/jupyter/Dockerfile
@@ -239,9 +240,9 @@ services:
     environment:
       <<: [ *mlflow-client-env, *train-db-env ]
       # Login token of the UI (http://localhost:8888/?token=...).
-      JUPYTER_TOKEN: ${JUPYTER_TOKEN:?}
+      JUPYTER_TOKEN: sentinel2
     ports:
-      - "${JUPYTER_PORT:?}:8888"
+      - "8888:8888"
     volumes:
       - ./notebooks:/home/jovyan/work
       - ./data:/home/jovyan/data
@@ -266,7 +267,7 @@ services:
   # from the MinIO data bucket and the class areas from the training database.
   # ------------------------------------------------------------------------- #
   streamlit:
-    image: ${DOCKERHUB_USER:?}/sentinel2-streamlit:${IMAGE_TAG:?}
+    image: aristotekean/sentinel2-streamlit:0.1.0
     build:
       context: .
       dockerfile: apps/streamlit/Dockerfile
@@ -274,7 +275,7 @@ services:
     environment:
       <<: [ *mlflow-client-env, *train-db-env ]
     ports:
-      - "${STREAMLIT_PORT:?}:8501"
+      - "8501:8501"
     depends_on:
       mlflow:
         condition: service_healthy
@@ -290,7 +291,7 @@ services:
   # model_loaded=false; POST /model/reload retries without a restart.
   # ------------------------------------------------------------------------- #
   api:
-    image: ${DOCKERHUB_USER:?}/sentinel2-api:${IMAGE_TAG:?}
+    image: aristotekean/sentinel2-api:0.1.0
     build:
       context: .
       dockerfile: apps/api/Dockerfile
@@ -298,7 +299,7 @@ services:
     environment:
       <<: *mlflow-client-env
     ports:
-      - "${API_PORT:?}:8000"
+      - "8000:8000"
     depends_on:
       mlflow:
         condition: service_healthy

@@ -2,7 +2,7 @@
 
 Reads the production model from the MLflow registry, the predicted GeoTIFFs
 from the MinIO data bucket and the class areas from the training database.
-Everything is configured through the environment (see .env.example).
+Everything is configured through the environment (see docker-compose.yml).
 """
 
 from __future__ import annotations
