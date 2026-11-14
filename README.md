@@ -80,7 +80,7 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 
 | Task | How |
 |------|-----|
-| Build the phase 1 report | Run `notebooks/01_phase1_training.ipynb`, then `python3 docs/build_tables.py` and `latexmk -pdf phase1_report.tex` inside `docs/` |
+| Build the phase 1 report | Run `notebooks/01_phase1_training.ipynb` and `notebooks/02_phase2_tuning.ipynb` (about one hour), then `python3 docs/build_tables.py` and `latexmk -pdf phase1_report.tex` inside `docs/` |
 | Open JupyterLab | <http://localhost:8888/?token=sentinel2>; notebooks persist in `./notebooks` |
 | Copy the scene into MinIO | `mc` from the host or the MinIO console: bucket `sentinel2`, prefix `bands/` |
 | Query the training database | `docker compose exec postgres psql -U training -d training` |

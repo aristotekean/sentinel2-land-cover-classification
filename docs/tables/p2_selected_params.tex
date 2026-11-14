@@ -1,0 +1,11 @@
+\begin{tabular}{>{\raggedright\arraybackslash}l>{\raggedright\arraybackslash}p{11cm}}
+\toprule
+Model & Selected configuration \\
+\midrule
+Logistic Regression & \texttt{indices} = True, \texttt{C} = 1, \texttt{class\_weight} = balanced \\
+Naive Bayes & \texttt{indices} = True, \texttt{log} = True, \texttt{var\_smoothing} = 1e-06 \\
+Decision Tree & \texttt{class\_weight} = None, \texttt{criterion} = gini, \texttt{max\_depth} = None, \texttt{min\_samples\_leaf} = 20 \\
+Random Forest & \texttt{class\_weight} = balanced\_subsample, \texttt{max\_depth} = None, \texttt{max\_features} = 0.5, \texttt{min\_samples\_leaf} = 5 \\
+Gradient Boosting & \texttt{class\_weight} = None, \texttt{l2\_regularization} = 1, \texttt{learning\_rate} = 0.1, \texttt{max\_leaf\_nodes} = 31 \\
+\bottomrule
+\end{tabular}
