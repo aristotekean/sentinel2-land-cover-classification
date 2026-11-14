@@ -1,0 +1,9 @@
+Class,name,precision,recall,f1
+2,Dark area pixels,0.2827,0.1661,0.2092
+3,Cloud shadows,0.8029,0.7784,0.7905
+4,Vegetation,0.7812,0.8114,0.796
+5,Not vegetated,0.9631,0.9731,0.9681
+6,Water,0.2427,0.1906,0.2136
+7,Unclassified,0.529,0.5046,0.5165
+8,Cloud medium probability,0.7536,0.6785,0.7141
+9,Cloud high probability,0.9439,0.9484,0.9462

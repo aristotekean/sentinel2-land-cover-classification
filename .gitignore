@@ -230,3 +230,11 @@ apps/airflow/logs/
 
 # macOS
 .DS_Store
+
+# LaTeX build files
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc

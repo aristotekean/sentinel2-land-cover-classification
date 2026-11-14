@@ -12,24 +12,24 @@
       "model": "Logistic Regression",
       "overall_accuracy": 0.9068752938717936,
       "kappa": 0.7804074287696787,
-      "f1_macro": 0.5155507098919366,
-      "mlflow_run_id": "803aff78a8874dc0aa29598bba24ef39"
+      "f1_macro": 0.5799945486284287,
+      "mlflow_run_id": "e8f475766c1f40ff808541b91fce9655"
     },
     {
       "key": "naive_bayes",
       "model": "Naive Bayes",
       "overall_accuracy": 0.7675147588945196,
       "kappa": 0.5493708658226564,
-      "f1_macro": 0.43201949715062116,
-      "mlflow_run_id": "9e11d2ccb5ec45d4a8a761b365aad28a"
+      "f1_macro": 0.4860219342944488,
+      "mlflow_run_id": "f101b92499744aa9aaca3ac85dd0dc34"
     },
     {
       "key": "decision_tree",
       "model": "Decision Tree",
       "overall_accuracy": 0.8995785660797938,
       "kappa": 0.7695039974462139,
-      "f1_macro": 0.5392774198437582,
-      "mlflow_run_id": "0c7ca36fba8f4440aa7d93c84ca58fac"
+      "f1_macro": 0.606687097324228,
+      "mlflow_run_id": "7d75d3beb9494e41bae5ff05a387b029"
     }
   ]
 }

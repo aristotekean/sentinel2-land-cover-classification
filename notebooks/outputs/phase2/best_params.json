@@ -1,0 +1,61 @@
+{
+  "dummy": {
+    "model": "Most frequent (baseline)",
+    "params": {},
+    "tuned_on": "full",
+    "candidates": 1
+  },
+  "logistic_regression": {
+    "model": "Logistic Regression",
+    "params": {
+      "features__indices": true,
+      "model__C": 1,
+      "model__class_weight": "balanced"
+    },
+    "tuned_on": "full",
+    "candidates": 16
+  },
+  "naive_bayes": {
+    "model": "Naive Bayes",
+    "params": {
+      "features__indices": true,
+      "features__log": true,
+      "model__var_smoothing": 1e-06
+    },
+    "tuned_on": "full",
+    "candidates": 40
+  },
+  "decision_tree": {
+    "model": "Decision Tree",
+    "params": {
+      "model__class_weight": null,
+      "model__criterion": "gini",
+      "model__max_depth": null,
+      "model__min_samples_leaf": 20
+    },
+    "tuned_on": "full",
+    "candidates": 64
+  },
+  "random_forest": {
+    "model": "Random Forest",
+    "params": {
+      "model__class_weight": "balanced_subsample",
+      "model__max_depth": null,
+      "model__max_features": 0.5,
+      "model__min_samples_leaf": 5
+    },
+    "tuned_on": "subsample",
+    "candidates": 16
+  },
+  "gradient_boosting": {
+    "model": "Gradient Boosting (HistGradientBoosting)",
+    "params": {
+      "model__class_weight": null,
+      "model__l2_regularization": 1.0,
+      "model__learning_rate": 0.1,
+      "model__max_leaf_nodes": 31
+    },
+    "tuned_on": "subsample",
+    "candidates": 36
+  }
+}
