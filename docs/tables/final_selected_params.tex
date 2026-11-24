@@ -1,0 +1,14 @@
+\begin{tabular}{>{\raggedright\arraybackslash}l>{\raggedright\arraybackslash}p{10.5cm}}
+\toprule
+Model & Selected configuration \\
+\midrule
+Logistic Regression & \texttt{indices} = True, \texttt{C} = 1, \texttt{class\_weight} = balanced \\
+K-Nearest Neighbors & \texttt{indices} = False, \texttt{log} = True, \texttt{n\_neighbors} = 5, \texttt{weights} = distance \\
+Naive Bayes & \texttt{indices} = True, \texttt{log} = True, \texttt{var\_smoothing} = 1e-06 \\
+Decision Tree & \texttt{class\_weight} = None, \texttt{criterion} = gini, \texttt{max\_depth} = None, \texttt{min\_samples\_leaf} = 20 \\
+Random Forest & \texttt{class\_weight} = balanced\_subsample, \texttt{max\_depth} = None, \texttt{max\_features} = 0.5, \texttt{min\_samples\_leaf} = 5 \\
+Gradient Boosting & \texttt{class\_weight} = None, \texttt{l2\_regularization} = 1, \texttt{learning\_rate} = 0.1, \texttt{max\_leaf\_nodes} = 31 \\
+Support Vector Machine & \texttt{indices} = False, \texttt{log} = True, \texttt{C} = 1000 \\
+Neural Network (MLP) & \texttt{class\_weight} = None, \texttt{alpha} = 1e-04, \texttt{hidden\_layer\_sizes} = (128, 64) \\
+\bottomrule
+\end{tabular}

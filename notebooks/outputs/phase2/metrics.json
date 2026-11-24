@@ -21,14 +21,14 @@
     "8",
     "9"
   ],
-  "selected": "gradient_boosting",
+  "selected": "svm",
   "models": [
     {
       "key": "dummy",
       "model": "Most frequent (baseline)",
       "tuned_on": "full",
-      "cv_f1_macro_mean": 0.10588512548190243,
-      "cv_f1_macro_std": 0.0006951956625966465,
+      "cv_f1_macro_mean": 0.1058851254819024,
+      "cv_f1_macro_std": 0.0006951956625966,
       "cv_accuracy_mean": 0.7347678339403032,
       "cv_kappa_mean": 0.0,
       "test_overall_accuracy": 0.7410706511328213,
@@ -42,14 +42,14 @@
       "test_f1_weighted": 0.6308597639195148,
       "train_accuracy": 0.7347101957615211,
       "fit_seconds": 0.0,
-      "mlflow_run_id": "8b0d048bfca14a7ba04c90dc72e4273d"
+      "mlflow_run_id": "1f0adcf6ee9a4155997d743cd7ed1b40"
     },
     {
       "key": "logistic_regression",
       "model": "Logistic Regression",
       "tuned_on": "full",
       "cv_f1_macro_mean": 0.6238864668996512,
-      "cv_f1_macro_std": 0.03027930945058794,
+      "cv_f1_macro_std": 0.0302793094505879,
       "cv_accuracy_mean": 0.8510077131427254,
       "cv_kappa_mean": 0.7051776423587259,
       "test_overall_accuracy": 0.8456803023178866,
@@ -62,15 +62,15 @@
       "test_recall_weighted": 0.8456803023178866,
       "test_f1_weighted": 0.8747673343228102,
       "train_accuracy": 0.8557748689201665,
-      "fit_seconds": 73.1,
-      "mlflow_run_id": "45f63183016141beb4430591f766c729"
+      "fit_seconds": 74.3,
+      "mlflow_run_id": "06f70a567f65470394dd7c9d4540db20"
     },
     {
       "key": "naive_bayes",
       "model": "Naive Bayes",
       "tuned_on": "full",
       "cv_f1_macro_mean": 0.6039861815826557,
-      "cv_f1_macro_std": 0.02513634265341902,
+      "cv_f1_macro_std": 0.025136342653419,
       "cv_accuracy_mean": 0.8506063024308055,
       "cv_kappa_mean": 0.6927616348761314,
       "test_overall_accuracy": 0.8442087665221253,
@@ -84,14 +84,14 @@
       "test_f1_weighted": 0.868108201879044,
       "train_accuracy": 0.8526852442168154,
       "fit_seconds": 0.1,
-      "mlflow_run_id": "2ba151685d884ac3bf15b2d132d339de"
+      "mlflow_run_id": "a9af2249dede4acfbee12533f9ff5203"
     },
     {
       "key": "decision_tree",
       "model": "Decision Tree",
       "tuned_on": "full",
       "cv_f1_macro_mean": 0.6753683245833184,
-      "cv_f1_macro_std": 0.037256713309050185,
+      "cv_f1_macro_std": 0.0372567133090501,
       "cv_accuracy_mean": 0.913355318775633,
       "cv_kappa_mean": 0.8032472503834718,
       "test_overall_accuracy": 0.9181773853682322,
@@ -105,15 +105,15 @@
       "test_f1_weighted": 0.9159093518306136,
       "train_accuracy": 0.9454230269793108,
       "fit_seconds": 3.7,
-      "mlflow_run_id": "254d4f261c714aae817e3fcd6628b634"
+      "mlflow_run_id": "17ce7986657e42bdbf6ab75f82354974"
     },
     {
       "key": "random_forest",
       "model": "Random Forest",
       "tuned_on": "subsample",
       "cv_f1_macro_mean": 0.7033056312051776,
-      "cv_f1_macro_std": 0.03572625759398371,
-      "cv_accuracy_mean": 0.9133473891931839,
+      "cv_f1_macro_std": 0.0357262575939837,
+      "cv_accuracy_mean": 0.913347389193184,
       "cv_kappa_mean": 0.8128269486752554,
       "test_overall_accuracy": 0.9212162373961653,
       "test_kappa": 0.8253169248169937,
@@ -125,15 +125,15 @@
       "test_recall_weighted": 0.9212162373961653,
       "test_f1_weighted": 0.9245536686162481,
       "train_accuracy": 0.9668179850700123,
-      "fit_seconds": 65.0,
-      "mlflow_run_id": "80e494762d4e44979342999c91d87fe5"
+      "fit_seconds": 66.3,
+      "mlflow_run_id": "3ccad7bf43034b6c92447bf4c7fe9a5b"
     },
     {
       "key": "gradient_boosting",
       "model": "Gradient Boosting (HistGradientBoosting)",
       "tuned_on": "subsample",
       "cv_f1_macro_mean": 0.7048909941029418,
-      "cv_f1_macro_std": 0.03963804514141279,
+      "cv_f1_macro_std": 0.0396380451414127,
       "cv_accuracy_mean": 0.9233625069334506,
       "cv_kappa_mean": 0.8250165032110252,
       "test_overall_accuracy": 0.9332236211970814,
@@ -146,8 +146,71 @@
       "test_recall_weighted": 0.9332236211970814,
       "test_f1_weighted": 0.9307916920523941,
       "train_accuracy": 0.9719822852988023,
-      "fit_seconds": 302.7,
-      "mlflow_run_id": "000dd2fbc2aa4d038ffe401a24425a5b"
+      "fit_seconds": 307.8,
+      "mlflow_run_id": "e008ed186d1547cc8e0333c3df87813c"
+    },
+    {
+      "key": "knn",
+      "model": "K-Nearest Neighbors",
+      "tuned_on": "subsample",
+      "cv_f1_macro_mean": 0.6935233985743718,
+      "cv_f1_macro_std": 0.0303804578877638,
+      "cv_accuracy_mean": 0.9159744530259152,
+      "cv_kappa_mean": 0.8082387738098156,
+      "test_overall_accuracy": 0.9221392125106664,
+      "test_kappa": 0.8182194715031749,
+      "test_balanced_accuracy": 0.6273801830823695,
+      "test_precision_macro": 0.6650052875166894,
+      "test_recall_macro": 0.6273801830823695,
+      "test_f1_macro": 0.6426022123459063,
+      "test_precision_weighted": 0.9183404056953268,
+      "test_recall_weighted": 0.9221392125106664,
+      "test_f1_weighted": 0.9196432577468131,
+      "train_accuracy": 1.0,
+      "fit_seconds": 0.2,
+      "mlflow_run_id": "aa93ec99f4d345abb4459e5199b954b1"
+    },
+    {
+      "key": "svm",
+      "model": "Support Vector Machine",
+      "tuned_on": "subsample",
+      "cv_f1_macro_mean": 0.730721863516219,
+      "cv_f1_macro_std": 0.0415617020877533,
+      "cv_accuracy_mean": 0.9293851180529382,
+      "cv_kappa_mean": 0.8385183531530934,
+      "test_overall_accuracy": 0.9356442540445467,
+      "test_kappa": 0.849162602634695,
+      "test_balanced_accuracy": 0.6608222762127729,
+      "test_precision_macro": 0.7169966311024526,
+      "test_recall_macro": 0.6608222762127729,
+      "test_f1_macro": 0.6847855229606985,
+      "test_precision_weighted": 0.9313261807148092,
+      "test_recall_weighted": 0.9356442540445467,
+      "test_f1_weighted": 0.9330396378598967,
+      "train_accuracy": 0.9514764738618603,
+      "fit_seconds": 2369.1,
+      "mlflow_run_id": "15f4da5fa68b4866afae732460df00ff"
+    },
+    {
+      "key": "neural_network",
+      "model": "Neural Network (MLP)",
+      "tuned_on": "subsample",
+      "cv_f1_macro_mean": 0.7098366053810194,
+      "cv_f1_macro_std": 0.0493828755849066,
+      "cv_accuracy_mean": 0.9274985610833156,
+      "cv_kappa_mean": 0.8346751780199755,
+      "test_overall_accuracy": 0.9329362798878498,
+      "test_kappa": 0.8435311120874077,
+      "test_balanced_accuracy": 0.6536250943506847,
+      "test_precision_macro": 0.6959794212007433,
+      "test_recall_macro": 0.6536250943506847,
+      "test_f1_macro": 0.6725314878406453,
+      "test_precision_weighted": 0.9297675669978263,
+      "test_recall_weighted": 0.9329362798878498,
+      "test_f1_weighted": 0.9309305318288615,
+      "train_accuracy": 0.9495084106450258,
+      "fit_seconds": 474.2,
+      "mlflow_run_id": "3de062ccad07407ca2a377d1e48c5244"
     }
   ]
 }

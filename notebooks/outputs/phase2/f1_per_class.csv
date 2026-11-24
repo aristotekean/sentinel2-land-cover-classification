@@ -1,9 +1,9 @@
-Class,name,Most frequent (baseline),Logistic Regression,Naive Bayes,Decision Tree,Random Forest,Gradient Boosting (HistGradientBoosting)
-2,Dark area pixels,0.0,0.116,0.057,0.209,0.3,0.29
-3,Cloud shadows,0.0,0.754,0.777,0.79,0.824,0.841
-4,Vegetation,0.0,0.769,0.74,0.796,0.839,0.84
-5,Not vegetated,0.851,0.928,0.929,0.968,0.969,0.974
-6,Water,0.0,0.175,0.494,0.214,0.232,0.204
-7,Unclassified,0.0,0.324,0.371,0.517,0.472,0.487
-8,Cloud medium probability,0.0,0.622,0.458,0.714,0.749,0.778
-9,Cloud high probability,0.0,0.942,0.906,0.946,0.963,0.964
+Class,name,Most frequent (baseline),Logistic Regression,Naive Bayes,Decision Tree,Random Forest,Gradient Boosting (HistGradientBoosting),K-Nearest Neighbors,Support Vector Machine,Neural Network (MLP)
+2,Dark area pixels,0.0,0.116,0.057,0.209,0.3,0.29,0.234,0.333,0.311
+3,Cloud shadows,0.0,0.754,0.777,0.79,0.824,0.841,0.81,0.851,0.841
+4,Vegetation,0.0,0.769,0.74,0.796,0.839,0.84,0.808,0.839,0.846
+5,Not vegetated,0.851,0.928,0.929,0.968,0.969,0.974,0.97,0.975,0.974
+6,Water,0.0,0.175,0.494,0.214,0.232,0.204,0.186,0.197,0.18
+7,Unclassified,0.0,0.324,0.371,0.517,0.472,0.487,0.455,0.521,0.484
+8,Cloud medium probability,0.0,0.622,0.458,0.714,0.749,0.778,0.724,0.804,0.795
+9,Cloud high probability,0.0,0.942,0.906,0.946,0.963,0.964,0.953,0.959,0.949
