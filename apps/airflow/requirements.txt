@@ -1,4 +1,4 @@
-# Python dependencies of the DAGs (retrain_model, predict_raster).
+# Python dependencies of the DAGs.
 #
 # mlflow and scikit-learn match apps/jupyter so the model trained in phase 1
 # deserialises with identical code. Do not pin libraries the Airflow image

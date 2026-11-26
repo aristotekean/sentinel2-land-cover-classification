@@ -102,7 +102,7 @@ with map_tab:
         keys = []
         st.warning(f"Cannot list s3://{DATA_BUCKET}/{PREDICTIONS_PREFIX}: {exc}")
     if not keys:
-        st.info("No predicted raster in the data bucket yet. Run the `predict_raster` DAG.")
+        st.info("No predicted raster in the data bucket yet. Run `notebooks/05_scene_inference.ipynb`.")
     else:
         selected = st.selectbox("Prediction", keys)
         st.caption(f"s3://{DATA_BUCKET}/{selected}")

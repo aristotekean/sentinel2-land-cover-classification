@@ -19,7 +19,7 @@ flowchart TB
     minio[("MinIO<br/>bands · polygons · TSV · GeoTIFF · artifacts")]
     pg[("PostgreSQL + PostGIS<br/>mlflow · airflow · training")]
     jupyter["Jupyter<br/>extraction · TSV · training · HPO"]
-    airflow["Airflow<br/>DAGs: retrain_model · predict_raster"]
+    airflow["Airflow<br/>DAGs: upload_bands · load_polygons · extract_training_samples"]
     mlflow["MLflow<br/>tracking + model registry"]
     streamlit["Streamlit<br/>map · metrics · areas"]
     api["FastAPI (optional)<br/>pixel inference"]
@@ -42,7 +42,7 @@ flowchart TB
 | `minio` | 1 | console <http://localhost:9001>, S3 `localhost:9000` | `minioadmin` / `minioadmin` | Buckets `mlflow` (artifacts) and `sentinel2` (`bands/`, `polygons/`, `tsv/`, `predictions/`) |
 | `mlflow` | 1 | <http://localhost:5001> | none | Tracking server and model registry; artifacts proxied to MinIO |
 | `jupyter` | 1 | <http://localhost:8888/?token=sentinel2> | token `JUPYTER_TOKEN` | JupyterLab with rasterio, geopandas, scikit-learn, optuna, mlflow; `./notebooks` and `./data` mounted |
-| `airflow-apiserver` | 2 | <http://localhost:8080> | `airflow` / `airflow` | DAGs `upload_bands`, `load_polygons`, `extract_training_samples`, `retrain_model` and `predict_raster` (the last two are skeletons) in `apps/airflow/dags`; `./data` mounted read-only |
+| `airflow-apiserver` | 2 | <http://localhost:8080> | `airflow` / `airflow` | DAGs `upload_bands`, `load_polygons` and `extract_training_samples` in `apps/airflow/dags`; `./data` mounted read-only |
 | `streamlit` | 2 | <http://localhost:8501> | none | Map, metrics of the production model and class areas |
 | `api` | 2 (optional) | <http://localhost:8000/docs> | none | `POST /predict/pixel`, `GET /health`, `GET /model-info`, `POST /model/reload` |
 
@@ -53,7 +53,7 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 0. **Ingestion (Airflow).** `upload_bands` streams the ten `.jp2` bands out of `./data/imagery-sentinel2-bog-band.zip` into `s3://sentinel2/bands/` and verifies their sizes. It is idempotent: bands already stored with the same size are skipped. Another archive can be passed with the `archive` param. `load_polygons` validates `./data/PolygonsClasses.tsv` (columns `WKT`, `fid`, `class`) and loads the ground-truth polygons into `raw.polygon_classes` (EPSG:32618, the CRS of the scene) in one transaction that replaces the rows of the same file. Another file can be passed with the `polygons` param.
 1. **Extraction (Airflow).** `extract_training_samples` builds the training dataset in three layers. `extracted.polygon_pixels` holds every pixel whose centre lies inside a polygon of `raw.polygon_classes`, with the digital numbers of the ten bands read from `s3://sentinel2/bands/` and its latitude and longitude, nothing filtered out. `training.samples` keeps one row per clean pixel: pixels with no data in a band or claimed by polygons of different classes are dropped. The TSV with `Latitude`, `Longitude`, the bands in `BAND_NAMES` order and `Class` is exported to `s3://sentinel2/tsv/<scene>.tsv`, where the notebooks read it. Run it after `upload_bands` and `load_polygons`; every step replaces the rows of its scene.
 2. **Training and HPO (Jupyter).** Train the six architectures, tune them and log params, metrics (overall accuracy, kappa, precision, recall, F1) and confusion matrices as MLflow runs of the experiment `MLFLOW_EXPERIMENT_NAME`. Register the winner as `MODEL_NAME` and give it the alias `MODEL_ALIAS` (`production`).
-3. **Retrain and inference (Airflow).** `retrain_model` repeats step 2 from `training.samples`; `predict_raster` loads `models:/sentinel2-land-cover@production`, classifies the whole scene keeping the original CRS, uploads the GeoTIFF to `s3://sentinel2/predictions/` and stores the area per class in `training.class_areas`.
+3. **Scene inference (Jupyter).** `notebooks/05_scene_inference.ipynb` classifies the whole scene with the production model keeping the original CRS, uploads the GeoTIFF to `s3://sentinel2/predictions/` and stores the area per class in `training.class_areas`.
 4. **Visualisation.** Streamlit shows the predicted raster, the metrics of the production model and the class areas; the API classifies a single pixel from its ten band values.
 
 ## Repository layout
@@ -64,7 +64,7 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 ├── apps/
 │   ├── mlflow/                   # official image + psycopg2 + boto3
 │   ├── jupyter/                  # scipy-notebook + geospatial and MLOps libraries
-│   ├── airflow/                  # image, compose slice and skeleton DAGs
+│   ├── airflow/                  # image, compose slice and ingestion DAGs
 │   ├── streamlit/                # dashboard
 │   └── api/                      # optional FastAPI
 ├── infra/database/
@@ -85,7 +85,7 @@ Every value (ports, credentials, image tag, bucket and model names) is written i
 | Copy the scene into MinIO | `mc` from the host or the MinIO console: bucket `sentinel2`, prefix `bands/` |
 | Query the training database | `docker compose exec postgres psql -U training -d training` |
 | Add a migration | New file in `infra/database/migrations` (name order) and `docker compose up train-db-migrate` |
-| Trigger a DAG | Airflow UI, or `docker compose exec airflow-scheduler airflow dags trigger predict_raster` |
+| Trigger a DAG | Airflow UI, or `docker compose exec airflow-scheduler airflow dags trigger upload_bands` |
 | Change the served model | Move the alias in the MLflow UI (Models → version → alias) or with `MlflowClient().set_registered_model_alias` |
 | Reset everything | `docker compose down -v` (drops databases and buckets) |
 
