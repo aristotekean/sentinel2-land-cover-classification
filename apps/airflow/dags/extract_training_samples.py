@@ -152,8 +152,8 @@ def _polygon_pixels(polygons: list[tuple], transform, shape: tuple[int, int]):
             description="Polygons file to use, as stored in raw.polygon_classes.source",
         ),
         "scene": Param(
-            "",
-            type="string",
+            None,
+            type=["null", "string"],
             description="Scene to extract (prefix of the band files); empty when the bucket holds one scene",
         ),
     },
