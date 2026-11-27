@@ -1,5 +1,7 @@
 # Sentinel-2 land-cover classification · MLOps stack
 
+![True colour composite of the Bogotá scene next to the land-cover map predicted by the Support Vector Machine](docs/evidence/cover.png)
+
 Local MLOps platform for the ML101 final project: pixel-level land-cover classification of a Sentinel-2 L2A scene over Bogotá (tile T18NWL, 10 bands at 20 m). One `docker compose` stack takes the scene from the raw bands to a classified map: Airflow ingests the data, Jupyter trains and selects the model, MLflow tracks and registers it, and a Streamlit dashboard and a FastAPI service show the result.
 
 ## Quick path
@@ -450,3 +452,35 @@ docker compose down -v     # stop and drop databases and buckets
 - MLflow answers `403` from another machine: add the host to `--allowed-hosts` in the `mlflow` command of `docker-compose.yml` (and `--cors-allowed-origins <origin>` for its origin).
 - Airflow cannot write `apps/airflow/logs` on Linux: replace the user `50000` in `apps/airflow/compose.yml` with `id -u` and recreate the containers.
 - Database credentials changed in the compose files but login fails: they are applied when the volume is first created; run `down -v` or change them inside Postgres.
+
+## Evidence
+
+Screenshots of the reference run, in the order of the pipeline.
+
+### Airflow · ingestion DAGs
+
+![Airflow with the ingestion DAGs](docs/evidence/airflow.png)
+
+### MinIO · data bucket
+
+![MinIO console with the data bucket](docs/evidence/minio.png)
+
+### JupyterLab · notebooks
+
+![JupyterLab notebook run, 1 of 3](docs/evidence/notebook-1.png)
+
+![JupyterLab notebook run, 2 of 3](docs/evidence/notebook-2.png)
+
+![JupyterLab notebook run, 3 of 3](docs/evidence/notebook-3.png)
+
+### MLflow · runs and registered model
+
+![MLflow tracking server](docs/evidence/mlflow.png)
+
+### Streamlit · dashboard
+
+![Streamlit dashboard with the classified scene](docs/evidence/streamlit.png)
+
+### FastAPI · pixel inference
+
+![FastAPI pixel inference](docs/evidence/inference-api.png)
