@@ -1,5 +1,7 @@
 # Sentinel-2 land-cover classification · MLOps stack
 
+**Team:** Oscar Fabian Alfonso · Kevin Andrey Bueno · Oscar Andres Prieto · Juan Camilo Martinez
+
 ![True colour composite of the Bogotá scene next to the land-cover map predicted by the Support Vector Machine](docs/evidence/cover.png)
 
 Local MLOps platform for the ML101 final project: pixel-level land-cover classification of a Sentinel-2 L2A scene over Bogotá (tile T18NWL, 10 bands at 20 m). One `docker compose` stack takes the scene from the raw bands to a classified map: Airflow ingests the data, Jupyter trains and selects the model, MLflow tracks and registers it, and a Streamlit dashboard and a FastAPI service show the result.
