@@ -3,6 +3,7 @@
 streamlit==1.67.0
 mlflow==3.18.0
 pandas>=2.2,<3
+rasterio==1.5.2
 boto3==1.43.126
 psycopg2-binary==2.9.13
 sqlalchemy==2.1.8

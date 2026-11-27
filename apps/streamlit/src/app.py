@@ -7,18 +7,23 @@ Everything is configured through the environment (see docker-compose.yml).
 
 from __future__ import annotations
 
+import html
+import json
 import os
 
 import boto3
+import numpy as np
 import pandas as pd
 import sqlalchemy
 import streamlit as st
 from mlflow import MlflowClient
+from rasterio.io import MemoryFile
 
 MODEL_NAME = os.environ["MODEL_NAME"]
 MODEL_ALIAS = os.environ["MODEL_ALIAS"]
 DATA_BUCKET = os.environ["DATA_BUCKET"]
 PREDICTIONS_PREFIX = "predictions/"
+MAP_MAX_PIXELS = 1400  # longest side of the displayed map; the GeoTIFF keeps its resolution
 
 
 @st.cache_resource
@@ -77,6 +82,50 @@ def class_areas(prediction: str) -> pd.DataFrame:
         return pd.read_sql(query, conn, params={"prediction": prediction})
 
 
+@st.cache_data(ttl=600, show_spinner="Rendering the raster…")
+def land_cover_map(prediction: str) -> dict:
+    """Read a predicted raster and colour it with the table stored in the file.
+
+    The classes are read at full resolution, so the legend lists every class of
+    the raster; only the displayed image is reduced.
+    """
+    body = s3_client().get_object(Bucket=DATA_BUCKET, Key=prediction)["Body"].read()
+    with MemoryFile(body) as memory, memory.open() as raster:
+        codes = raster.read(1)
+        try:
+            colours = raster.colormap(1)
+        except ValueError as exc:
+            raise ValueError("the raster has no colour table") from exc
+        nodata = raster.nodata
+        names = json.loads(raster.tags().get("classes", "{}"))
+        crs, resolution = str(raster.crs), raster.res[0]
+
+    table = np.zeros((256, 4), dtype=np.uint8)
+    for code, colour in colours.items():
+        table[code] = colour
+    if nodata is not None:
+        table[int(nodata)] = (0, 0, 0, 0)  # transparent
+
+    counts = np.bincount(codes.ravel(), minlength=256)
+    step = max(1, -(-max(codes.shape) // MAP_MAX_PIXELS))  # ceiling division
+    return {
+        "image": table[codes[::step, ::step]],
+        "legend": [
+            {
+                "class_id": code,
+                "name": names.get(str(code), f"Class {code}"),
+                "colour": "#{:02x}{:02x}{:02x}".format(*table[code][:3]),
+            }
+            for code in np.flatnonzero(counts).tolist()
+            if nodata is None or code != int(nodata)
+        ],
+        "caption": (
+            f"{codes.shape[1]} × {codes.shape[0]} pixels at {resolution:g} m ({crs}), "
+            f"shown at {resolution * step:g} m"
+        ),
+    }
+
+
 st.set_page_config(page_title="Sentinel-2 land cover", page_icon="🛰️", layout="wide")
 st.title("Sentinel-2 land cover · Bogotá (T18NWL)")
 
@@ -106,8 +155,24 @@ with map_tab:
     else:
         selected = st.selectbox("Prediction", keys)
         st.caption(f"s3://{DATA_BUCKET}/{selected}")
-        # TODO: render the GeoTIFF with a discrete colour map (one colour per class).
-        st.info("Raster rendering is not implemented yet.")
+        try:
+            land_cover = land_cover_map(selected)
+        except Exception as exc:
+            st.warning(f"Cannot render s3://{DATA_BUCKET}/{selected}: {exc}")
+        else:
+            image_column, legend_column = st.columns([4, 1])
+            image_column.image(land_cover["image"], caption=land_cover["caption"], width="stretch")
+            legend_column.markdown("**Land-cover class**")
+            legend_column.markdown(
+                "".join(
+                    '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.3rem">'
+                    f'<span style="width:1rem;height:1rem;flex:none;border:1px solid #555;'
+                    f'background:{entry["colour"]}"></span>'
+                    f'<span>{entry["class_id"]}: {html.escape(entry["name"])}</span></div>'
+                    for entry in land_cover["legend"]
+                ),
+                unsafe_allow_html=True,
+            )
 
 with metrics_tab:
     st.subheader("Validation metrics of the production model")

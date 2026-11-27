@@ -13,6 +13,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 RUN groupadd -g 1000 app && useradd -u 1000 -g 1000 -m -s /bin/bash app
 
+# libexpat is a runtime dependency of the rasterio wheel that the slim image lacks.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY apps/streamlit/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
