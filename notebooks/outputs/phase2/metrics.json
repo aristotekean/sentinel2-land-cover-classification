@@ -42,7 +42,7 @@
       "test_f1_weighted": 0.6308597639195148,
       "train_accuracy": 0.7347101957615211,
       "fit_seconds": 0.0,
-      "mlflow_run_id": "1f0adcf6ee9a4155997d743cd7ed1b40"
+      "mlflow_run_id": "0651091176334649999c11cc42b77b17"
     },
     {
       "key": "logistic_regression",
@@ -62,8 +62,8 @@
       "test_recall_weighted": 0.8456803023178866,
       "test_f1_weighted": 0.8747673343228102,
       "train_accuracy": 0.8557748689201665,
-      "fit_seconds": 74.3,
-      "mlflow_run_id": "06f70a567f65470394dd7c9d4540db20"
+      "fit_seconds": 53.8,
+      "mlflow_run_id": "588a4c2b11f0429e9a40491187b07dd8"
     },
     {
       "key": "naive_bayes",
@@ -84,7 +84,7 @@
       "test_f1_weighted": 0.868108201879044,
       "train_accuracy": 0.8526852442168154,
       "fit_seconds": 0.1,
-      "mlflow_run_id": "a9af2249dede4acfbee12533f9ff5203"
+      "mlflow_run_id": "5e04a9f58e5f4e6387e86aff9cf08544"
     },
     {
       "key": "decision_tree",
@@ -105,7 +105,7 @@
       "test_f1_weighted": 0.9159093518306136,
       "train_accuracy": 0.9454230269793108,
       "fit_seconds": 3.7,
-      "mlflow_run_id": "17ce7986657e42bdbf6ab75f82354974"
+      "mlflow_run_id": "a65153978f5b490fb0229232d8226530"
     },
     {
       "key": "random_forest",
@@ -125,8 +125,8 @@
       "test_recall_weighted": 0.9212162373961653,
       "test_f1_weighted": 0.9245536686162481,
       "train_accuracy": 0.9668179850700123,
-      "fit_seconds": 66.3,
-      "mlflow_run_id": "3ccad7bf43034b6c92447bf4c7fe9a5b"
+      "fit_seconds": 61.3,
+      "mlflow_run_id": "10b161253a7447888921e661486f3f09"
     },
     {
       "key": "gradient_boosting",
@@ -146,8 +146,8 @@
       "test_recall_weighted": 0.9332236211970814,
       "test_f1_weighted": 0.9307916920523941,
       "train_accuracy": 0.9719822852988023,
-      "fit_seconds": 307.8,
-      "mlflow_run_id": "e008ed186d1547cc8e0333c3df87813c"
+      "fit_seconds": 397.1,
+      "mlflow_run_id": "db9d39bf6d064191aa6d2245fda683b2"
     },
     {
       "key": "knn",
@@ -168,7 +168,7 @@
       "test_f1_weighted": 0.9196432577468131,
       "train_accuracy": 1.0,
       "fit_seconds": 0.2,
-      "mlflow_run_id": "aa93ec99f4d345abb4459e5199b954b1"
+      "mlflow_run_id": "9b71d596653a49ba99560878bbf1c99f"
     },
     {
       "key": "svm",
@@ -188,8 +188,8 @@
       "test_recall_weighted": 0.9356442540445467,
       "test_f1_weighted": 0.9330396378598967,
       "train_accuracy": 0.9514764738618603,
-      "fit_seconds": 2369.1,
-      "mlflow_run_id": "15f4da5fa68b4866afae732460df00ff"
+      "fit_seconds": 2381.7,
+      "mlflow_run_id": "58cfe1ee9a93410fb4f52e0f34264c6f"
     },
     {
       "key": "neural_network",
@@ -209,8 +209,8 @@
       "test_recall_weighted": 0.9329362798878498,
       "test_f1_weighted": 0.9309305318288615,
       "train_accuracy": 0.9495084106450258,
-      "fit_seconds": 474.2,
-      "mlflow_run_id": "3de062ccad07407ca2a377d1e48c5244"
+      "fit_seconds": 390.8,
+      "mlflow_run_id": "66b5ea4705da428597fb8b39a9ead6e2"
     }
   ]
 }

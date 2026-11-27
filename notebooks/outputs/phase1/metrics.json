@@ -13,7 +13,7 @@
       "overall_accuracy": 0.9068752938717936,
       "kappa": 0.7804074287696787,
       "f1_macro": 0.5799945486284287,
-      "mlflow_run_id": "e8f475766c1f40ff808541b91fce9655"
+      "mlflow_run_id": "5de323c9d5a24e9e85cf48f88986a802"
     },
     {
       "key": "naive_bayes",
@@ -21,7 +21,7 @@
       "overall_accuracy": 0.7675147588945196,
       "kappa": 0.5493708658226564,
       "f1_macro": 0.4860219342944488,
-      "mlflow_run_id": "f101b92499744aa9aaca3ac85dd0dc34"
+      "mlflow_run_id": "726f4c2afd6c406db2b82ab8003689b9"
     },
     {
       "key": "decision_tree",
@@ -29,7 +29,7 @@
       "overall_accuracy": 0.8995785660797938,
       "kappa": 0.7695039974462139,
       "f1_macro": 0.606687097324228,
-      "mlflow_run_id": "7d75d3beb9494e41bae5ff05a387b029"
+      "mlflow_run_id": "4a9cac108b0541eca0c422f4c91f3eb5"
     }
   ]
 }
